@@ -1,5 +1,6 @@
 ﻿
 using System;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Xml.Linq;
 
@@ -43,9 +44,52 @@ namespace Vidzy
             // WHERE @@ROWCOUNT > 0 AND[Id] = scope_identity()
 
         }
+
+        static void AddTags(params string[] newTagNames)
+        {
+            // adding tags to the database
+            using (var context = new VidzyContext())
+            {
+                // first we bring out the tags which name is inside the newTagNames array
+                var existingTags = context.Tags
+                    .Where(t => newTagNames.Contains(t.Name))
+                    .ToList(); // equivalent to SELECT * FROM Tags WHERE Name IN ('classic', 'drama');
+
+                // Query in sql profiler:
+
+                // SELECT
+                // [Extent1].[Id] AS[Id], 
+                // [Extent1].[Name] AS[Name]
+                // FROM[dbo].[Tags] AS[Extent1]
+                // WHERE([Extent1].[Name] IN(N'classic', N'drama')) AND([Extent1].[Name] IS NOT NULL)
+
+                foreach (var name in newTagNames)
+                {
+                    if (!existingTags.Any(t => t.Name.Equals(name, StringComparison.CurrentCultureIgnoreCase))) // CurrentCultureIgnoreCase is used to ignore case sensitivity
+                        context.Tags.Add(new Tag { Name = name });
+                }
+
+                // Queries in sql profiler:
+
+                // exec sp_executesql N'INSERT [dbo].[Tags]([Name])
+                // VALUES(@0)
+                // SELECT[Id]
+                // FROM[dbo].[Tags]
+                // WHERE @@ROWCOUNT > 0 AND[Id] = scope_identity()',N'@0 nvarchar(max) ',@0=N'classic'
+                // 
+                // exec sp_executesql N'INSERT [dbo].[Tags]([Name])
+                // VALUES(@0)
+                // SELECT[Id]
+                // FROM[dbo].[Tags]
+                // WHERE @@ROWCOUNT > 0 AND[Id] = scope_identity()',N'@0 nvarchar(max) ',@0=N'drama'
+
+                context.SaveChanges();
+            }
+        }
         static void Main(string[] args)
         {
             //AddNewVideo();
+            AddTags("classic", "drama");
         }
     }
 }
